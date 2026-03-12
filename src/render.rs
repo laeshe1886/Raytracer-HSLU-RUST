@@ -2,6 +2,7 @@ use crate::vector3d::Vec3;
 use crate::ray::Ray;
 use crate::scene::Scene;
 use crate::object::Hit;
+use rayon::prelude::*;
 
 pub struct RenderData<'a> {
     pub start_x: usize,
@@ -75,11 +76,19 @@ pub fn calculate_pixel_color(x: usize, y: usize, width: usize, height: usize, sc
     0x000000 
 }
 
-pub fn draw_pixels(data: RenderData) {
-    for y in 0..data.height {
-        for x in data.start_x..data.end_x {
-            let index = y * data.width + x;
-            data.buffer[index] = calculate_pixel_color(x, y, data.width, data.height, data.scene);
-        }
-    }
+pub fn draw_pixels(mut data: RenderData) {
+    let width = data.width;
+    let height = data.height;
+    let scene = data.scene;
+    let start_x = data.start_x;
+    let end_x = data.end_x;
+
+    data.buffer
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for x in start_x..end_x {
+                row[x] = calculate_pixel_color(x, y, width, height, scene);
+            }
+        });
 }
