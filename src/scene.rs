@@ -1,96 +1,75 @@
-use crate::vector3d::Vec3;
-use crate::object::Object;
-use rand::Rng; 
+use crate::math::vector3d::Vec3;
+use crate::geometry::hittable::Hittable;
+use crate::geometry::sphere::Sphere;
+use crate::geometry::triangle::Triangle;
+use crate::geometry::plane::Plane;
 
 pub struct Scene {
-    pub objects: Vec<Object>,
-    pub light_pos: Vec3,
+    pub objects: Vec<Box<dyn Hittable>>,
+    pub lights: Vec<Vec3>,
 }
 
 impl Scene {
-    pub fn default_scene() -> Self {
-        Self {
-            objects: vec![
-                Object::Sphere {
-                    center: Vec3::new(-2.0, 0.0, -6.0), 
-                    radius: 2.0,
-                    color: Vec3::new(1.0, 0.0, 0.0),
-                },
-                Object::Cube {
-                    min: Vec3::new(1.0, -2.0, -7.0),  
-                    max: Vec3::new(4.0, 1.0, -4.0),   
-                    color: Vec3::new(0.0, 1.0, 0.0),
-                },
-                Object::Plane {
-                    point: Vec3::new(0.0, -2.0, 0.0), 
-                    normal: Vec3::new(0.0, 1.0, 0.0).normalize(), 
-                    color: Vec3::new(0.2, 0.5, 0.8),
-                },
-                Object::Triangle {
-                    a: Vec3::new(0.0, 2.0, -4.0),
-                    b: Vec3::new(-1.5, 0.0, -4.0),
-                    c: Vec3::new(1.5, 0.0, -4.0),
-                    color: Vec3::new(1.0, 1.0, 0.0), 
-                },
-            ],
-            light_pos: Vec3::new(5.0, 5.0, 0.0),
-        }
+
+    pub fn add_cube_mesh(objects: &mut Vec<Box<dyn Hittable>>, min: Vec3, max: Vec3, color: Vec3) {
+        let v0 = Vec3::new(min.x, min.y, max.z); 
+        let v1 = Vec3::new(max.x, min.y, max.z); 
+        let v2 = Vec3::new(max.x, max.y, max.z); 
+        let v3 = Vec3::new(min.x, max.y, max.z); 
+        
+        let v4 = Vec3::new(min.x, min.y, min.z); 
+        let v5 = Vec3::new(max.x, min.y, min.z); 
+        let v6 = Vec3::new(max.x, max.y, min.z); 
+        let v7 = Vec3::new(min.x, max.y, min.z); 
+
+        let mut add_face = |a, b, c, d| {
+            objects.push(Box::new(Triangle { a, b, c, color }));
+            objects.push(Box::new(Triangle { a: a, b: c, c: d, color }));
+        };
+
+        add_face(v0, v1, v2, v3);
+        add_face(v5, v4, v7, v6);
+        add_face(v1, v5, v6, v2);
+        add_face(v4, v0, v3, v7);
+        add_face(v3, v2, v6, v7);
+        add_face(v4, v5, v1, v0);
     }
 
-    pub fn random_scene() -> Self {
-        let mut objects = Vec::new();
-        let mut rng = rand::thread_rng();
-
-        objects.push(Object::Plane {
-            point: Vec3::new(0.0, -1.0, 0.0), 
-            normal: Vec3::new(0.0, 1.0, 0.0),
-            color: Vec3::new(0.5, 0.5, 0.5), 
-        });
-
-        for a in -11..11 {
-            for b in -20..-2 { 
-                
-                let center = Vec3::new(
-                    a as f32 + 0.9 * rng.r#gen::<f32>(),
-                    -0.8, 
-                    b as f32 + 0.9 * rng.r#gen::<f32>(),
-                );
-
-                let color = Vec3::new(
-                    rng.r#gen::<f32>(),
-                    rng.r#gen::<f32>(),
-                    rng.r#gen::<f32>(),
-                );
-
-                objects.push(Object::Sphere {
-                    center,
-                    radius: 0.2,
-                    color,
-                });
-            }
-        }
-
-        objects.push(Object::Sphere {
-            center: Vec3::new(0.0, 0.0, -5.0),
-            radius: 1.0,
-            color: Vec3::new(1.0, 0.2, 0.2), 
-        });
+    pub fn default_scene() -> Self {
+        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
         
-        objects.push(Object::Sphere {
-            center: Vec3::new(-4.0, 0.0, -8.0),
-            radius: 1.0,
-            color: Vec3::new(0.2, 1.0, 0.2), 
-        });
+        objects.push(Box::new(Sphere {
+            center: Vec3::new(-2.0, 0.0, -6.0), 
+            radius: 2.0,
+            color: Vec3::new(1.0, 0.0, 0.0), 
+        }));
 
-        objects.push(Object::Sphere {
-            center: Vec3::new(4.0, 0.0, -6.0),
-            radius: 1.0,
-            color: Vec3::new(0.2, 0.2, 1.0), 
-        });
+        objects.push(Box::new(Triangle {
+            a: Vec3::new(0.0, 2.0, -4.0),
+            b: Vec3::new(-1.5, 0.0, -4.0),
+            c: Vec3::new(1.5, 0.0, -4.0),
+            color: Vec3::new(1.0, 1.0, 0.0), 
+        }));
+
+        objects.push(Box::new(Plane {
+            point: Vec3::new(0.0, -2.0, 0.0),
+            normal: Vec3::new(0.0, 1.0, 0.0).normalize(), 
+            color: Vec3::new(0.2, 0.5, 0.8), 
+        }));
+
+        Self::add_cube_mesh(
+            &mut objects, 
+            Vec3::new(1.0, -2.0, -7.0), 
+            Vec3::new(4.0, 1.0, -4.0), 
+            Vec3::new(0.0, 1.0, 0.0) 
+        );
 
         Self {
             objects,
-            light_pos: Vec3::new(10.0, 20.0, 10.0), 
+            lights: vec![
+                Vec3::new(5.0, 5.0, 0.0),
+                Vec3::new(-5.0, 5.0, 0.0), 
+            ],
         }
     }
 }

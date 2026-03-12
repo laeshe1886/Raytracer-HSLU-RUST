@@ -1,7 +1,7 @@
-use crate::vector3d::Vec3;
-use crate::ray::Ray;
+use crate::math::vector3d::Vec3;
+use crate::math::ray::Ray;
 use crate::scene::Scene;
-use crate::object::Hit;
+use crate::geometry::hittable::{Hit, Hittable};
 use rayon::prelude::*;
 
 pub struct RenderData<'a> {
@@ -36,34 +36,38 @@ pub fn calculate_pixel_color(x: usize, y: usize, width: usize, height: usize, sc
     }
 
     if let Some(hit) = closest_hit {
-        let light_dir = (scene.light_pos - hit.point).normalize();
-        let light_distance = (scene.light_pos - hit.point).length();
+        let ambient = 0.2;
+        let mut total_diffuse = 0.0;
         
-        let eps = 0.001;
-        let shadow_ray = Ray {
-            origin: hit.point + light_dir * eps,
-            direction: light_dir,
-        };
+        let light_power = 1.0 / scene.lights.len() as f32;
 
-        let mut in_shadow = false;
+        for &light_pos in &scene.lights {
+            let light_dir = (light_pos - hit.point).normalize();
+            let light_distance = (light_pos - hit.point).length();
+            
+            let eps = 0.001;
+            let shadow_ray = Ray {
+                origin: hit.point + light_dir * eps,
+                direction: light_dir,
+            };
 
-        for object in &scene.objects {
-            if let Some(shadow_hit) = object.intersect(&shadow_ray) {
-                if shadow_hit.distance < light_distance {
-                    in_shadow = true;
-                    break; 
+            let mut in_shadow = false;
+
+            for object in &scene.objects {
+                if let Some(shadow_hit) = object.intersect(&shadow_ray) {
+                    if shadow_hit.distance < light_distance {
+                        in_shadow = true;
+                        break; 
+                    }
                 }
             }
-        }
 
-        let ambient = 0.2;
-        let mut diffuse = 0.0;
-
-        if !in_shadow {
-            diffuse = light_dir.dot(&hit.normal).max(0.0);
+            if !in_shadow {
+                total_diffuse += light_dir.dot(&hit.normal).max(0.0) * light_power;
+            }
         }
         
-        let final_intensity = ambient + diffuse;
+        let final_intensity = ambient + total_diffuse;
         let final_color = hit.color * final_intensity;
         
         let r = (final_color.x.clamp(0.0, 1.0) * 255.0) as u32;

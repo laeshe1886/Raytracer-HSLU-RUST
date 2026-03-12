@@ -1,8 +1,7 @@
-mod vector3d;
-mod ray;
-mod object;
-mod scene;
+mod math;
+mod geometry;
 mod render;
+mod scene;
 
 use minifb::{Key, Window, WindowOptions};
 use scene::Scene;
