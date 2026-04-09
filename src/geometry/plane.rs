@@ -1,28 +1,26 @@
 use crate::math::vector3d::Vec3;
 use crate::math::ray::Ray;
 use crate::geometry::hittable::{Hit, Hittable};
+use crate::material::Material;
 
 pub struct Plane {
     pub point: Vec3,
     pub normal: Vec3,
-    pub color: Vec3,
+    pub material: Material,
 }
 
 impl Hittable for Plane {
     fn intersect(&self, ray: &Ray) -> Option<Hit> {
-        let denom = ray.direction.dot(&self.normal);
-        
-        if denom.abs() > 1e-6 {
-            let v = self.point - ray.origin;
-            let lambda = v.dot(&self.normal) / denom;
-            
-            if lambda > 0.001 {
-                let hit_point = ray.origin + ray.direction * lambda;
-                return Some(Hit { 
-                    distance: lambda, 
-                    point: hit_point, 
-                    normal: self.normal, 
-                    color: self.color 
+        let denom = self.normal.dot(&ray.direction);
+        if denom.abs() > 0.0001 {
+            let t = (self.point - ray.origin).dot(&self.normal) / denom;
+            if t > 0.001 {
+                return Some(Hit {
+                    distance: t,
+                    point: ray.at(t),
+                    normal: if denom < 0.0 { self.normal } else { self.normal * -1.0 },
+                    uv: (0.0, 0.0),
+                    material: self.material,
                 });
             }
         }

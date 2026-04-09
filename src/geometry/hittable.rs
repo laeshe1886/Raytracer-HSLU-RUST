@@ -1,11 +1,13 @@
 use crate::math::vector3d::Vec3;
 use crate::math::ray::Ray;
+use crate::material::Material;
 
 pub struct Hit {
-    pub distance: f32,
-    pub point: Vec3,
+    pub distance: f32,    
+    pub point: Vec3,      
     pub normal: Vec3,
-    pub color: Vec3,
+    pub uv: (f32, f32),   
+    pub material: Material,
 }
 
 pub trait Hittable: Sync + Send {
