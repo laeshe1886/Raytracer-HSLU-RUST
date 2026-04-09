@@ -13,7 +13,6 @@ impl BVHNode {
     pub fn new(mut objects: Vec<Arc<dyn Hittable>>) -> Arc<dyn Hittable> {
         let axis = rand::random::<usize>() % 3;
 
-        // Korrigierte Sortier-Logik ohne Index-Zugriff [axis]
         objects.sort_by(|a, b| {
             let box_a = a.bounding_box().min;
             let box_b = b.bounding_box().min;

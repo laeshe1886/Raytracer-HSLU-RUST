@@ -32,12 +32,11 @@ impl Hittable for Triangle {
 
         let t = f * edge2.dot(&q);
         if t > 0.001 {
-            // NEU: Baryzentrische Interpolation der Normalen
             let w = 1.0 - u - v;
             let outward_normal = if let (Some(na), Some(nb), Some(nc)) = (self.na, self.nb, self.nc) {
                 (na * w + nb * u + nc * v).normalize()
             } else {
-                edge1.cross(&edge2).normalize() // Fallback: Flat Shading
+                edge1.cross(&edge2).normalize() 
             };
 
             let frontface = ray.direction.dot(&outward_normal) < 0.0;
@@ -53,7 +52,7 @@ impl Hittable for Triangle {
 
     fn bounding_box(&self) -> AABB {
         let min = crate::math::vector3d::Vec3::new(
-            self.a.x.min(self.b.x).min(self.c.x) - 0.001, // Kleiner Offset gegen Rundungsfehler
+            self.a.x.min(self.b.x).min(self.c.x) - 0.001, 
             self.a.y.min(self.b.y).min(self.c.y) - 0.001,
             self.a.z.min(self.b.z).min(self.c.z) - 0.001,
         );

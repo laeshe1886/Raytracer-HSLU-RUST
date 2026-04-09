@@ -128,8 +128,12 @@ impl Mesh {
 
         let mut save_current_material = |name: &str, map: &mut HashMap<String, Material>, ni: f32, d: f32, kd: Vec3, ks: Vec3, ns: f32, illum: i32| {
             if name.is_empty() { return; }
+            let absorption_multiplier = 50.0; 
             let mat = if d < 1.0 {
-                Material::Dielectric { refractive_index: ni, absorption: Vec3::new(1.0 - kd.x, 1.0 - kd.y, 1.0 - kd.z) * 0.1 }
+                Material::Dielectric { 
+                    refractive_index: ni, 
+                    absorption: Vec3::new(1.0 - kd.x, 1.0 - kd.y, 1.0 - kd.z) * absorption_multiplier 
+                }
             } else if illum == 3 {
                 Material::Metal { specular_color: kd, glossiness: 1.0 / (ns / 10.0 + 1.0) }
             } else {

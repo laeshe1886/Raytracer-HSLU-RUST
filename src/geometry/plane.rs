@@ -33,7 +33,6 @@ impl Hittable for Plane {
     }
 
     fn bounding_box(&self) -> AABB {
-        // Eine Ebene ist theoretisch unendlich. Wir geben ihr eine extrem grosse Box.
         AABB {
             min: crate::math::vector3d::Vec3::new(-10000.0, -0.001, -10000.0),
             max: crate::math::vector3d::Vec3::new(10000.0, 0.001, 10000.0),
