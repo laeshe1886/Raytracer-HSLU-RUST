@@ -16,11 +16,10 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    /// Konstruktor, der eine OBJ-Datei und die zugehörige MTL-Datei einliest
     pub fn from_obj(file_path: &str, fallback_material: Material) -> Self {
         let mut triangles: Vec<Arc<dyn Hittable>> = Vec::new();
         let mut vertices = Vec::new();
-        let mut normals = Vec::new(); // Speicher für Vertex Normals
+        let mut normals = Vec::new();
 
         let path = Path::new(file_path);
         let file = File::open(path).expect("OBJ Datei nicht gefunden");
@@ -38,13 +37,11 @@ impl Mesh {
 
             match parts[0] {
                 "mtllib" => {
-                    // Lade die MTL-Datei aus demselben Ordner wie die OBJ-Datei
                     let mtl_file_name = parts[1];
                     let mtl_path = path.parent().unwrap_or(Path::new("")).join(mtl_file_name);
                     materials = Self::load_materials(&mtl_path);
                 },
                 "usemtl" => {
-                    // Wechsle das aktive Material für die folgenden Dreiecke
                     if let Some(mat) = materials.get(parts[1]) {
                         current_material = mat.clone();
                     }
@@ -57,7 +54,6 @@ impl Mesh {
                     ));
                 },
                 "vn" => {
-                    // Normalenvektoren einlesen
                     normals.push(Vec3::new(
                         parts[1].parse().unwrap(),
                         parts[2].parse().unwrap(),
@@ -70,16 +66,14 @@ impl Mesh {
 
                     for part in &parts[1..] {
                         let sub_parts: Vec<&str> = part.split('/').collect();
-                        // Vertex Index (OBJ zählt ab 1, Rust ab 0)
                         v_indices.push(sub_parts[0].parse::<usize>().unwrap() - 1);
                         
-                        // Normalen Index extrahieren (falls vorhanden, Format: v/vt/vn oder v//vn)
                         if sub_parts.len() >= 3 && !sub_parts[2].is_empty() {
                             n_indices.push(sub_parts[2].parse::<usize>().unwrap() - 1);
                         }
                     }
 
-                    // Face in Dreiecke zerlegen (Triangulierung)
+                    // Triangulierung (Schritt 3 & 6)
                     for i in 1..v_indices.len() - 1 {
                         let (na, nb, nc) = if n_indices.len() == v_indices.len() {
                             (
@@ -112,10 +106,8 @@ impl Mesh {
         Mesh { bvh_root }
     }
 
-    /// Hilfsfunktion zum Parsen der .mtl Datei
     fn load_materials(path: &Path) -> HashMap<String, Material> {
         let mut materials = HashMap::new();
-        
         let file = match File::open(path) {
             Ok(f) => f,
             Err(_) => {
@@ -128,30 +120,20 @@ impl Mesh {
         let mut current_name = String::new();
         
         let mut kd = Vec3::new(0.8, 0.8, 0.8);
+        let mut ks = Vec3::new(1.0, 1.0, 1.0);
         let mut ns = 10.0;
         let mut ni = 1.0;
         let mut d = 1.0;
+        let mut illum = 2;
 
-        // Innere Funktion, um das zusammengebaute Material in die Map zu speichern
-        let save_current_material = |name: &str, map: &mut HashMap<String, Material>, ni: f32, d: f32, kd: Vec3, ns: f32| {
+        let mut save_current_material = |name: &str, map: &mut HashMap<String, Material>, ni: f32, d: f32, kd: Vec3, ks: Vec3, ns: f32, illum: i32| {
             if name.is_empty() { return; }
-            
-            // Heuristik: Wenn der Brechungsindex > 1.0 ist oder das Material transparent ist (d < 1.0), machen wir Glas daraus
-            let mat = if ni > 1.0 || d < 1.0 {
-                Material::Dielectric {
-                    refractive_index: if ni > 1.0 { ni } else { 1.5 },
-                    // Wir leiten die Absorption grob aus der Objektfarbe (Kd) ab
-                    absorption: Vec3::new(1.0 - kd.x, 1.0 - kd.y, 1.0 - kd.z) * 0.1,
-                }
+            let mat = if d < 1.0 {
+                Material::Dielectric { refractive_index: ni, absorption: Vec3::new(1.0 - kd.x, 1.0 - kd.y, 1.0 - kd.z) * 0.1 }
+            } else if illum == 3 {
+                Material::Metal { specular_color: kd, glossiness: 1.0 / (ns / 10.0 + 1.0) }
             } else {
-                Material::Phong {
-                    ambient: 0.1,
-                    albedo: kd,
-                    shininess: ns,
-                    kd: 0.8,
-                    ka: 1.0,
-                    ks: 0.5,
-                }
+                Material::Phong { ambient: 0.1, albedo: kd, shininess: ns, kd: 0.8, ka: 1.0, ks: 0.5 }
             };
             map.insert(name.to_string(), mat);
         };
@@ -163,32 +145,25 @@ impl Mesh {
 
             match parts[0] {
                 "newmtl" => {
-                    // Speichere das vorherige Material, bevor ein neues beginnt
-                    save_current_material(&current_name, &mut materials, ni, d, kd, ns);
+                    save_current_material(&current_name, &mut materials, ni, d, kd, ks, ns, illum);
                     current_name = parts[1].to_string();
-                    
-                    // Reset der Werte für das neue Material
                     kd = Vec3::new(0.8, 0.8, 0.8);
+                    ks = Vec3::new(1.0, 1.0, 1.0);
                     ns = 10.0;
                     ni = 1.0;
                     d = 1.0;
+                    illum = 2;
                 },
-                "Kd" => {
-                    kd = Vec3::new(
-                        parts[1].parse().unwrap_or(0.8),
-                        parts[2].parse().unwrap_or(0.8),
-                        parts[3].parse().unwrap_or(0.8),
-                    );
-                },
+                "Kd" => { kd = Vec3::new(parts[1].parse().unwrap_or(0.8), parts[2].parse().unwrap_or(0.8), parts[3].parse().unwrap_or(0.8)); },
+                "Ks" => { ks = Vec3::new(parts[1].parse().unwrap_or(1.0), parts[2].parse().unwrap_or(1.0), parts[3].parse().unwrap_or(1.0)); },
                 "Ns" => { ns = parts[1].parse().unwrap_or(10.0); },
                 "Ni" => { ni = parts[1].parse().unwrap_or(1.0); },
                 "d" | "Tr" => { d = parts[1].parse().unwrap_or(1.0); },
+                "illum" => { illum = parts[1].parse().unwrap_or(2); },
                 _ => {}
             }
         }
-        // Das letzte Material in der Datei speichern
-        save_current_material(&current_name, &mut materials, ni, d, kd, ns);
-
+        save_current_material(&current_name, &mut materials, ni, d, kd, ks, ns, illum);
         println!("MTL geladen: {} Materialien gefunden.", materials.len());
         materials
     }

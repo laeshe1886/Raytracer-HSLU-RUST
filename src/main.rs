@@ -18,7 +18,7 @@ fn main() {
     if args.len() < 2 {
         println!("Hint: You can use arguments to change the view.");
         println!("Usage: cargo run --release -- <scene> <mode>");
-        println!("Scenes: default, birds_eye, close_up, frogs_eye, wide_angle, mesh");
+        println!("Scenes: default, birds_eye, close_up, frogs_eye, wide_angle, mesh, monkey");
         println!("Modes: static, anim\n");
         println!("Starting with default static view...");
     }
@@ -32,6 +32,7 @@ fn main() {
 
     println!("Initializing Scene: {}...", scene_type);
     let mut scene = match scene_type {
+        "monkey" => Scene::monkey_scene(WIDTH, HEIGHT),
         "mesh" => Scene::mesh_scene(WIDTH, HEIGHT),
         "birds_eye" => Scene::birds_eye_scene(WIDTH, HEIGHT),
         "close_up" => Scene::close_up_scene(WIDTH, HEIGHT),
@@ -40,14 +41,8 @@ fn main() {
         _ => Scene::default_scene(WIDTH, HEIGHT),
     };
 
-    match scene_type {
-        "mesh" => scene.set_camera_orbit(0.0, 12.0, 3.5, Vec3::new(0.0, 1.5, 0.0), 35.0, WIDTH, HEIGHT),
-        "birds_eye" => scene.set_camera_orbit(0.0, 9.0, 15.0, Vec3::new(0.0, 0.0, -11.0), 60.0, WIDTH, HEIGHT),
-        "close_up" => scene.set_camera_orbit(0.0, 2.8, 1.0, Vec3::new(0.0, 0.0, 0.0), 30.0, WIDTH, HEIGHT),
-        "frogs_eye" => scene.set_camera_orbit(0.0, 7.0, -0.6, Vec3::new(0.0, 4.0, -15.0), 85.0, WIDTH, HEIGHT),
-        "wide_angle" => scene.set_camera_orbit(0.0, 12.0, 1.0, Vec3::new(0.0, 0.0, -10.0), 110.0, WIDTH, HEIGHT),
-        _ => scene.set_camera_orbit(0.0, 12.0, 2.0, Vec3::new(0.0, 0.0, -5.0), 80.0, WIDTH, HEIGHT),
-    }
+    // Initial camera sync for static mode (t=0)
+    update_camera_for_scene(&mut scene, scene_type, 0.0, WIDTH, HEIGHT);
 
     let mut window = Window::new(
         &format!("Raytracer - Scene: {} | Mode: {}", scene_type, mode),
@@ -60,15 +55,7 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if mode == "anim" {
             let elapsed = start_time.elapsed().as_secs_f32() * 0.4;
-
-            match scene_type {
-                "mesh" => scene.set_camera_orbit(elapsed, 12.0, 3.5, Vec3::new(0.0, 1.5, 0.0), 35.0, WIDTH, HEIGHT),
-                "birds_eye" => scene.set_camera_orbit(elapsed, 9.0, 15.0, Vec3::new(0.0, 0.0, -11.0), 60.0, WIDTH, HEIGHT),
-                "close_up" => scene.set_camera_orbit(elapsed, 2.8, 1.0, Vec3::new(0.0, 0.0, 0.0), 30.0, WIDTH, HEIGHT),
-                "frogs_eye" => scene.set_camera_orbit(elapsed, 7.0, -0.6, Vec3::new(0.0, 4.0, -15.0), 85.0, WIDTH, HEIGHT),
-                "wide_angle" => scene.set_camera_orbit(elapsed, 12.0, 1.0, Vec3::new(0.0, 0.0, -10.0), 110.0, WIDTH, HEIGHT),
-                _ => scene.set_camera_orbit(elapsed, 12.0, 2.0, Vec3::new(0.0, 0.0, -5.0), 80.0, WIDTH, HEIGHT),
-            }
+            update_camera_for_scene(&mut scene, scene_type, elapsed, WIDTH, HEIGHT);
         }
 
         draw_pixels(RenderData { height: HEIGHT, width: WIDTH, buffer: &mut buffer, scene: &scene });
@@ -77,5 +64,17 @@ fn main() {
         if mode == "static" {
             while window.is_open() && !window.is_key_down(Key::Escape) { window.update(); }
         }
+    }
+}
+
+fn update_camera_for_scene(scene: &mut Scene, scene_type: &str, time: f32, w: usize, h: usize) {
+    match scene_type {
+        "monkey" => scene.set_camera_orbit(time, 10.0, 1.5, Vec3::new(0.0, 0.0, 0.0), 45.0, w, h),
+        "mesh" => scene.set_camera_orbit(time, 12.0, 3.5, Vec3::new(0.0, 1.5, 0.0), 35.0, w, h),
+        "birds_eye" => scene.set_camera_orbit(time, 9.0, 15.0, Vec3::new(0.0, 0.0, -11.0), 60.0, w, h),
+        "close_up" => scene.set_camera_orbit(time, 2.8, 1.0, Vec3::new(0.0, 0.0, 0.0), 30.0, w, h),
+        "frogs_eye" => scene.set_camera_orbit(time, 7.0, -0.6, Vec3::new(0.0, 4.0, -15.0), 85.0, w, h),
+        "wide_angle" => scene.set_camera_orbit(time, 12.0, 1.0, Vec3::new(0.0, 0.0, -10.0), 110.0, w, h),
+        _ => scene.set_camera_orbit(time, 12.0, 2.0, Vec3::new(0.0, 0.0, -5.0), 80.0, w, h),
     }
 }

@@ -27,8 +27,8 @@ impl Scene {
         let v7 = Vec3::new(min.x, max.y, min.z); 
 
         let mut add_face = |a, b, c, d| {
-            objects.push(Box::new(Triangle { a, b, c, na: None, nb: None, nc: None, material }));
-            objects.push(Box::new(Triangle { a, b: c, c: d, na: None, nb: None, nc: None, material }));
+            objects.push(Box::new(Triangle { a, b, c, na: None, nb: None, nc: None, material: material.clone() }));
+            objects.push(Box::new(Triangle { a, b: c, c: d, na: None, nb: None, nc: None, material: material.clone() }));
         };
 
         add_face(v0, v1, v2, v3);
@@ -39,12 +39,9 @@ impl Scene {
         add_face(v4, v5, v1, v0);
     }
 
-    // Hilfsmethode: Berechnet die Kamera fuer einen Orbit um einen Punkt
     pub fn set_camera_orbit(&mut self, time: f32, radius: f32, height: f32, target: Vec3, fov: f32, width: usize, height_px: usize) {
         let cam_x = time.sin() * radius + target.x;
         let cam_z = time.cos() * radius + target.z;
-        
-        // Spezialfall fuer Birds Eye (Up-Vektor)
         let up = if height > 10.0 { Vec3::new(0.0, 0.0, -1.0) } else { Vec3::new(0.0, 1.0, 0.0) };
 
         self.camera = Camera::new(
@@ -56,23 +53,85 @@ impl Scene {
         );
     }
 
+    pub fn monkey_scene(width: usize, height: usize) -> Self {
+        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
+        
+        objects.push(Box::new(Plane {
+            point: Vec3::new(0.0, -1.5, 0.0),
+            normal: Vec3::new(0.0, 1.0, 0.0),
+            material: Material::Metal { 
+                specular_color: Vec3::new(0.1, 0.1, 0.15), 
+                glossiness: 0.01 
+            },
+        }));
+
+        let fallback = Material::Lambert { ambient: 0.1, albedo: Vec3::new(0.8, 0.8, 0.8) };
+        objects.push(Box::new(Mesh::from_obj("assets/monkey.obj", fallback)));
+
+        objects.push(Box::new(Sphere {
+            center: Vec3::new(-3.5, 0.0, 0.0),
+            radius: 1.5,
+            material: Material::Metal { 
+                specular_color: Vec3::new(0.9, 0.9, 1.0), 
+                glossiness: 0.0 
+            },
+        }));
+
+        objects.push(Box::new(Sphere {
+            center: Vec3::new(3.5, 0.0, 0.0),
+            radius: 1.5,
+            material: Material::Dielectric { 
+                refractive_index: 1.5, 
+                absorption: Vec3::new(0.0, 0.0, 0.0) 
+            },
+        }));
+
+        objects.push(Box::new(Sphere {
+            center: Vec3::new(0.0, -0.7, 4.0),
+            radius: 0.8,
+            material: Material::BlinnPhong { 
+                ambient: 0.05, 
+                albedo: Vec3::new(0.9, 0.1, 0.1), 
+                shininess: 100.0, 
+                kd: 0.8, ka: 1.0, ks: 1.0 
+            },
+        }));
+
+        objects.push(Box::new(Sphere {
+            center: Vec3::new(0.0, 2.5, -4.0),
+            radius: 1.0,
+            material: Material::Lambert { 
+                ambient: 0.1, 
+                albedo: Vec3::new(0.5, 0.5, 0.5) 
+            },
+        }));
+
+        let lights = vec![
+            Vec3::new(10.0, 15.0, 10.0),  
+            Vec3::new(-10.0, 10.0, -5.0), 
+        ];
+
+        let camera = Camera::new(Vec3::new(0.0, 0.0, 10.0), Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0), 45.0, width as f32 / height as f32);
+        
+        Self { 
+            objects, 
+            lights, 
+            camera, 
+            background_color: Color::new(0.01, 0.01, 0.03) 
+        }
+    }
+
     pub fn mesh_scene(width: usize, height: usize) -> Self {
         let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
-
-        // Infinity Floor (Dark Mirror)
         objects.push(Box::new(Plane {
             point: Vec3::new(0.0, 0.0, 0.0),
             normal: Vec3::new(0.0, 1.0, 0.0),
             material: Material::Metal { specular_color: Vec3::new(0.2, 0.2, 0.2), glossiness: 0.02 },
         }));
 
-        let glass_material = Material::Dielectric {
-            refractive_index: 1.5,
-            absorption: Vec3::new(0.05, 0.02, 0.02),
-        };
-        objects.push(Box::new(Mesh::from_obj("assets/Glas.obj", glass_material)));
+        let fallback = Material::Dielectric { refractive_index: 1.5, absorption: Vec3::new(0.0, 0.0, 0.0) };
+        objects.push(Box::new(Mesh::from_obj("assets/Glas.obj", fallback)));
 
-        // Golden Statues (Spheres)
         objects.push(Box::new(Sphere {
             center: Vec3::new(5.0, 1.5, -2.0),
             radius: 1.5,
