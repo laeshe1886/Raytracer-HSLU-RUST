@@ -33,7 +33,7 @@ fn main() {
     println!("Initializing Scene: {}...", scene_type);
     let mut scene = match scene_type {
         "monkey" => Scene::monkey_scene(WIDTH, HEIGHT),
-        "mesh" => Scene::mesh_scene(WIDTH, HEIGHT),
+        "glas" => Scene::glas_scene(WIDTH, HEIGHT),
         "birds_eye" => Scene::birds_eye_scene(WIDTH, HEIGHT),
         "close_up" => Scene::close_up_scene(WIDTH, HEIGHT),
         "frogs_eye" => Scene::frogs_eye_scene(WIDTH, HEIGHT),
@@ -70,7 +70,7 @@ fn main() {
 fn update_camera_for_scene(scene: &mut Scene, scene_type: &str, time: f32, w: usize, h: usize) {
     match scene_type {
         "monkey" => scene.set_camera_orbit(time, 10.0, 1.5, Vec3::new(0.0, 0.0, 0.0), 45.0, w, h),
-        "mesh" => scene.set_camera_orbit(time, 12.0, 3.5, Vec3::new(0.0, 1.5, 0.0), 35.0, w, h),
+        "glas" => scene.set_camera_orbit(time, 12.0, 3.5, Vec3::new(0.0, 1.5, 0.0), 35.0, w, h),
         "birds_eye" => scene.set_camera_orbit(time, 9.0, 15.0, Vec3::new(0.0, 0.0, -11.0), 60.0, w, h),
         "close_up" => scene.set_camera_orbit(time, 2.8, 1.0, Vec3::new(0.0, 0.0, 0.0), 30.0, w, h),
         "frogs_eye" => scene.set_camera_orbit(time, 7.0, -0.6, Vec3::new(0.0, 4.0, -15.0), 85.0, w, h),

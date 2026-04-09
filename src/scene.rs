@@ -121,7 +121,7 @@ impl Scene {
         }
     }
 
-    pub fn mesh_scene(width: usize, height: usize) -> Self {
+    pub fn glas_scene(width: usize, height: usize) -> Self {
         let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
         objects.push(Box::new(Plane {
             point: Vec3::new(0.0, 0.0, 0.0),
