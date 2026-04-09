@@ -2,6 +2,7 @@ mod math;
 mod geometry;
 mod render;
 mod scene;
+mod camera;
 
 use minifb::{Key, Window, WindowOptions};
 use scene::Scene;
@@ -13,7 +14,12 @@ fn main() {
 
     let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
     
-    let scene = Scene::default_scene(); 
+    // Wähle hier die gewünschte Szene aus:
+     let scene = Scene::default_scene(WIDTH, HEIGHT);
+    // let scene = Scene::vogelperspektive_scene(WIDTH, HEIGHT);
+    // let scene = Scene::nahaufnahme_scene(WIDTH, HEIGHT);
+    // let scene = Scene::froschperspektive_scene(WIDTH, HEIGHT);
+    // let scene = Scene::weitwinkel_scene(WIDTH, HEIGHT);
 
     let mut window = Window::new(
         "Raytracer Rust - HSLU",
@@ -21,6 +27,9 @@ fn main() {
         HEIGHT,
         WindowOptions::default(),
     ).expect("Cannot open window");
+
+    // Limitiere die Framerate, damit die CPU nicht unnötig heiss läuft
+    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let data = RenderData {
@@ -33,7 +42,6 @@ fn main() {
         };
 
         draw_pixels(data);
-
         window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
     }
 }

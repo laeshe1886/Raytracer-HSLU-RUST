@@ -1,7 +1,7 @@
-use crate::math::vector3d::Vec3;
-use crate::math::ray::Ray;
 use crate::scene::Scene;
-use crate::geometry::hittable::{Hit, Hittable};
+use crate::math::color::Color;
+use crate::geometry::hittable::Hit;
+use crate::math::ray::Ray;
 use rayon::prelude::*;
 
 pub struct RenderData<'a> {
@@ -14,14 +14,7 @@ pub struct RenderData<'a> {
 }
 
 pub fn calculate_pixel_color(x: usize, y: usize, width: usize, height: usize, scene: &Scene) -> u32 {
-    let aspect_ratio = width as f32 / height as f32;
-    let px = (2.0 * ((x as f32 + 0.5) / width as f32) - 1.0) * aspect_ratio;
-    let py = 1.0 - 2.0 * ((y as f32 + 0.5) / height as f32);
-
-    let ray = Ray {
-        origin: Vec3::new(0.0, 0.0, 0.0),
-        direction: Vec3::new(px, py, -1.0).normalize(),
-    };
+    let ray = scene.camera.make_ray(x, y, width, height);
 
     let mut closest_hit: Option<Hit> = None;
     let mut min_distance = f32::MAX;
@@ -35,52 +28,49 @@ pub fn calculate_pixel_color(x: usize, y: usize, width: usize, height: usize, sc
         }
     }
 
-    if let Some(hit) = closest_hit {
+    let final_color = if let Some(hit) = closest_hit {
         let ambient = 0.2;
         let mut total_diffuse = 0.0;
-        
-        let light_power = 1.0 / scene.lights.len() as f32;
+        let light_count = scene.lights.len() as f32;
 
         for &light_pos in &scene.lights {
             let light_dir = (light_pos - hit.point).normalize();
             let light_distance = (light_pos - hit.point).length();
             
-            let eps = 0.001;
             let shadow_ray = Ray {
-                origin: hit.point + light_dir * eps,
+                origin: hit.point + light_dir * 0.001,
                 direction: light_dir,
             };
 
             let mut in_shadow = false;
-
             for object in &scene.objects {
-                if let Some(shadow_hit) = object.intersect(&shadow_ray) {
-                    if shadow_hit.distance < light_distance {
+                if let Some(sh) = object.intersect(&shadow_ray) {
+                    if sh.distance < light_distance {
                         in_shadow = true;
-                        break; 
+                        break;
                     }
                 }
             }
 
             if !in_shadow {
-                total_diffuse += light_dir.dot(&hit.normal).max(0.0) * light_power;
+                total_diffuse += light_dir.dot(&hit.normal).max(0.0) / light_count;
             }
         }
         
-        let final_intensity = ambient + total_diffuse;
-        let final_color = hit.color * final_intensity;
-        
-        let r = (final_color.x.clamp(0.0, 1.0) * 255.0) as u32;
-        let g = (final_color.y.clamp(0.0, 1.0) * 255.0) as u32;
-        let b = (final_color.z.clamp(0.0, 1.0) * 255.0) as u32;
-        
-        return (r << 16) | (g << 8) | b;
-    }
-    
-    0x000000 
+        let intensity = ambient + total_diffuse;
+        Color::new(hit.color.x, hit.color.y, hit.color.z) * intensity
+    } else {
+        scene.background_color
+    };
+
+    let c = final_color.clamp();
+    let r = (c.r * 255.0) as u32;
+    let g = (c.g * 255.0) as u32;
+    let b = (c.b * 255.0) as u32;
+    (r << 16) | (g << 8) | b
 }
 
-pub fn draw_pixels(mut data: RenderData) {
+pub fn draw_pixels(data: RenderData) {
     let width = data.width;
     let height = data.height;
     let scene = data.scene;
