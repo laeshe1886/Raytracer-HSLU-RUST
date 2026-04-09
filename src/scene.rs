@@ -6,6 +6,7 @@ use crate::geometry::triangle::Triangle;
 use crate::geometry::plane::Plane;
 use crate::camera::Camera;
 use crate::material::Material;
+use crate::geometry::mesh::Mesh;
 
 pub struct Scene {
     pub objects: Vec<Box<dyn Hittable>>,
@@ -20,15 +21,14 @@ impl Scene {
         let v1 = Vec3::new(max.x, min.y, max.z); 
         let v2 = Vec3::new(max.x, max.y, max.z); 
         let v3 = Vec3::new(min.x, max.y, max.z); 
-        
         let v4 = Vec3::new(min.x, min.y, min.z); 
         let v5 = Vec3::new(max.x, min.y, min.z); 
         let v6 = Vec3::new(max.x, max.y, min.z); 
         let v7 = Vec3::new(min.x, max.y, min.z); 
 
         let mut add_face = |a, b, c, d| {
-            objects.push(Box::new(Triangle { a, b, c, material }));
-            objects.push(Box::new(Triangle { a, b: c, c: d, material }));
+            objects.push(Box::new(Triangle { a, b, c, na: None, nb: None, nc: None, material }));
+            objects.push(Box::new(Triangle { a, b: c, c: d, na: None, nb: None, nc: None, material }));
         };
 
         add_face(v0, v1, v2, v3);
@@ -39,293 +39,107 @@ impl Scene {
         add_face(v4, v5, v1, v0);
     }
 
+    // Hilfsmethode: Berechnet die Kamera fuer einen Orbit um einen Punkt
+    pub fn set_camera_orbit(&mut self, time: f32, radius: f32, height: f32, target: Vec3, fov: f32, width: usize, height_px: usize) {
+        let cam_x = time.sin() * radius + target.x;
+        let cam_z = time.cos() * radius + target.z;
+        
+        // Spezialfall fuer Birds Eye (Up-Vektor)
+        let up = if height > 10.0 { Vec3::new(0.0, 0.0, -1.0) } else { Vec3::new(0.0, 1.0, 0.0) };
+
+        self.camera = Camera::new(
+            Vec3::new(cam_x, height, cam_z),
+            target,
+            up,
+            fov,
+            width as f32 / height_px as f32
+        );
+    }
+
+    pub fn mesh_scene(width: usize, height: usize) -> Self {
+        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
+
+        // Infinity Floor (Dark Mirror)
+        objects.push(Box::new(Plane {
+            point: Vec3::new(0.0, 0.0, 0.0),
+            normal: Vec3::new(0.0, 1.0, 0.0),
+            material: Material::Metal { specular_color: Vec3::new(0.2, 0.2, 0.2), glossiness: 0.02 },
+        }));
+
+        let glass_material = Material::Dielectric {
+            refractive_index: 1.5,
+            absorption: Vec3::new(0.05, 0.02, 0.02),
+        };
+        objects.push(Box::new(Mesh::from_obj("assets/Glas.obj", glass_material)));
+
+        // Golden Statues (Spheres)
+        objects.push(Box::new(Sphere {
+            center: Vec3::new(5.0, 1.5, -2.0),
+            radius: 1.5,
+            material: Material::Metal { specular_color: Vec3::new(1.0, 0.8, 0.2), glossiness: 0.0 },
+        }));
+
+        let camera = Camera::new(Vec3::new(0.0, 3.0, -12.0), Vec3::new(0.0, 1.5, 0.0), Vec3::new(0.0, 1.0, 0.0), 35.0, width as f32 / height as f32);
+        Self { objects, lights: vec![Vec3::new(-15.0, 20.0, 10.0), Vec3::new(15.0, 15.0, -10.0)], camera, background_color: Color::new(0.02, 0.02, 0.05) }
+    }
+
+    pub fn birds_eye_scene(width: usize, height: usize) -> Self {
+        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
+        objects.push(Box::new(Plane { point: Vec3::new(0.0, -2.0, 0.0), normal: Vec3::new(0.0, 1.0, 0.0), material: Material::Lambert { ambient: 0.1, albedo: Vec3::new(0.1, 0.1, 0.1) } }));
+
+        for i in 0..5 {
+            let x = (i as f32 * 3.0) - 6.0;
+            let mat = if i % 2 == 0 { Material::Metal { specular_color: Vec3::new(0.8, 0.8, 0.9), glossiness: 0.0 } } 
+                      else { Material::Dielectric { refractive_index: 1.5, absorption: Vec3::new(0.0, 0.0, 0.0) } };
+            Self::add_cube_mesh(&mut objects, Vec3::new(x, -2.0, -12.0), Vec3::new(x + 1.2, i as f32, -10.0), mat);
+        }
+
+        let camera = Camera::new(Vec3::new(0.0, 15.0, -5.0), Vec3::new(0.0, 0.0, -11.0), Vec3::new(0.0, 0.0, -1.0), 60.0, width as f32 / height as f32);
+        Self { objects, lights: vec![Vec3::new(0.0, 25.0, -10.0), Vec3::new(10.0, 10.0, 0.0)], camera, background_color: Color::new(0.0, 0.0, 0.02) }
+    }
+
+    pub fn close_up_scene(width: usize, height: usize) -> Self {
+        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
+        objects.push(Box::new(Sphere { center: Vec3::new(0.0, 0.0, 0.0), radius: 1.0, material: Material::Dielectric { refractive_index: 1.5, absorption: Vec3::new(0.2, 0.05, 0.05) } }));
+        objects.push(Box::new(Sphere { center: Vec3::new(1.2, -0.5, -1.0), radius: 0.4, material: Material::Metal { specular_color: Vec3::new(0.9, 0.9, 1.0), glossiness: 0.0 } }));
+
+        let camera = Camera::new(Vec3::new(2.0, 1.0, -3.0), Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0), 30.0, width as f32 / height as f32);
+        Self { objects, lights: vec![Vec3::new(5.0, 5.0, -5.0), Vec3::new(-5.0, 2.0, 2.0)], camera, background_color: Color::new(0.05, 0.05, 0.08) }
+    }
+
+    pub fn frogs_eye_scene(width: usize, height: usize) -> Self {
+        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
+        objects.push(Box::new(Plane { point: Vec3::new(0.0, -1.0, 0.0), normal: Vec3::new(0.0, 1.0, 0.0), material: Material::Lambert { ambient: 0.1, albedo: Vec3::new(0.2, 0.2, 0.2) } }));
+        for i in -3..4 {
+            let mat = Material::BlinnPhong { ambient: 0.05, albedo: Vec3::new(0.1, 0.2, 0.5), shininess: 80.0, kd: 0.8, ka: 1.0, ks: 0.9 };
+            Self::add_cube_mesh(&mut objects, Vec3::new(i as f32 * 5.0 - 0.5, -1.0, -20.0), Vec3::new(i as f32 * 5.0 + 0.5, 12.0, -19.0), mat);
+        }
+
+        let camera = Camera::new(Vec3::new(0.0, -0.7, -6.0), Vec3::new(0.0, 4.0, -15.0), Vec3::new(0.0, 1.0, 0.0), 85.0, width as f32 / height as f32);
+        Self { objects, lights: vec![Vec3::new(0.0, 20.0, -12.0)], camera, background_color: Color::new(0.01, 0.01, 0.03) }
+    }
+
+    pub fn wide_angle_scene(width: usize, height: usize) -> Self {
+        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
+        objects.push(Box::new(Plane { point: Vec3::new(0.0, -2.0, 0.0), normal: Vec3::new(0.0, 1.0, 0.0), material: Material::Lambert { ambient: 0.1, albedo: Vec3::new(0.15, 0.15, 0.15) } }));
+        for z in 0..12 {
+            let color = if z % 2 == 0 { Vec3::new(0.9, 0.2, 0.2) } else { Vec3::new(0.2, 0.4, 0.9) };
+            objects.push(Box::new(Sphere { center: Vec3::new(-5.0, 0.0, z as f32 * -5.0), radius: 1.2, material: Material::Metal { specular_color: color, glossiness: 0.0 } }));
+            objects.push(Box::new(Sphere { center: Vec3::new(5.0, 0.0, z as f32 * -5.0), radius: 1.2, material: Material::Metal { specular_color: color, glossiness: 0.0 } }));
+        }
+
+        let camera = Camera::new(Vec3::new(0.0, 0.5, 8.0), Vec3::new(0.0, 0.0, -20.0), Vec3::new(0.0, 1.0, 0.0), 115.0, width as f32 / height as f32);
+        Self { objects, lights: vec![Vec3::new(0.0, 15.0, 0.0)], camera, background_color: Color::new(0.0, 0.0, 0.0) }
+    }
+
     pub fn default_scene(width: usize, height: usize) -> Self {
         let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
-        
-        // 1. Perfekter Spiegel auf der linken Seite
-        objects.push(Box::new(Sphere {
-            center: Vec3::new(-3.5, 0.0, -5.0), 
-            radius: 2.0,
-            material: Material::Metal {
-                specular_color: Vec3::new(0.9, 0.9, 0.9), // Silber
-                glossiness: 0.0,
-            },
-        }));
+        objects.push(Box::new(Sphere { center: Vec3::new(-3.0, 0.0, -5.0), radius: 2.0, material: Material::Metal { specular_color: Vec3::new(0.9, 0.9, 0.9), glossiness: 0.02 } }));
+        objects.push(Box::new(Sphere { center: Vec3::new(3.0, 0.0, -5.0), radius: 2.0, material: Material::Dielectric { refractive_index: 1.5, absorption: Vec3::new(0.0, 0.0, 0.0) } }));
+        objects.push(Box::new(Sphere { center: Vec3::new(0.0, 0.5, -9.0), radius: 2.5, material: Material::BlinnPhong { ambient: 0.1, albedo: Vec3::new(0.9, 0.1, 0.1), shininess: 120.0, kd: 0.8, ka: 1.0, ks: 1.0 } }));
+        objects.push(Box::new(Plane { point: Vec3::new(0.0, -2.0, 0.0), normal: Vec3::new(0.0, 1.0, 0.0), material: Material::Lambert { ambient: 0.2, albedo: Vec3::new(0.4, 0.4, 0.4) } }));
 
-        // 2. Kugel aus Glas auf der rechten Seite
-        objects.push(Box::new(Sphere {
-            center: Vec3::new(3.5, 0.0, -5.0), 
-            radius: 2.0,
-            material: Material::Dielectric {
-                refractive_index: 1.5, // Glas
-                absorption: 0.0,
-            },
-        }));
-
-        // Rote Blinn-Phong Kugel im Hintergrund
-        objects.push(Box::new(Sphere {
-            center: Vec3::new(0.0, 0.0, -8.0), 
-            radius: 2.0,
-            material: Material::BlinnPhong {
-                ambient: 0.1,
-                albedo: Vec3::new(1.0, 0.0, 0.0),
-                shininess: 50.0,
-                kd: 0.8,
-                ka: 1.0,
-                ks: 0.8,
-            },
-        }));
-
-        // Matter Lambert-Boden
-        objects.push(Box::new(Plane {
-            point: Vec3::new(0.0, -2.0, 0.0),
-            normal: Vec3::new(0.0, 1.0, 0.0).normalize(), 
-            material: Material::Lambert {
-                ambient: 0.2,
-                albedo: Vec3::new(0.2, 0.5, 0.8),
-            },
-        }));
-
-        let camera = Camera::new(
-            Vec3::new(0.0, 0.0, 0.0), 
-            Vec3::new(0.0, 0.0, -1.0), 
-            Vec3::new(0.0, 1.0, 0.0), 
-            90.0, 
-            width as f32 / height as f32
-        );
-
-        Self {
-            objects,
-            lights: vec![
-                Vec3::new(5.0, 5.0, 0.0),
-                Vec3::new(-5.0, 5.0, 0.0), 
-            ],
-            camera,
-            background_color: Color::new(0.1, 0.1, 0.1), 
-        }
-    }
-
-    pub fn vogelperspektive_scene(width: usize, height: usize) -> Self {
-        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
-        
-        objects.push(Box::new(Plane {
-            point: Vec3::new(0.0, -2.0, 0.0),
-            normal: Vec3::new(0.0, 1.0, 0.0).normalize(), 
-            material: Material::Lambert {
-                ambient: 0.2,
-                albedo: Vec3::new(0.3, 0.3, 0.3),
-            },
-        }));
-
-        for i in 0..3 {
-            Self::add_cube_mesh(
-                &mut objects, 
-                Vec3::new(i as f32 * 3.0 - 3.0, -2.0, -12.0), 
-                Vec3::new(i as f32 * 3.0 - 1.5, i as f32 + 1.0, -10.5), 
-                Material::Phong {
-                    ambient: 0.1,
-                    albedo: Vec3::new(0.8, 0.2, 0.2),
-                    shininess: 40.0,
-                    kd: 0.8,
-                    ka: 1.0,
-                    ks: 0.7,
-                }
-            );
-        }
-
-        // 4 Kugeln mit unterschiedlichen Materialien, um sie von oben zu betrachten
-        let materials = vec![
-            Material::Metal { specular_color: Vec3::new(0.8, 0.8, 0.8), glossiness: 0.0 }, // Silber
-            Material::Dielectric { refractive_index: 1.5, absorption: 0.0 },               // Glas
-            Material::BlinnPhong { ambient: 0.1, albedo: Vec3::new(0.2, 0.7, 0.2), shininess: 80.0, kd: 0.7, ka: 1.0, ks: 0.9 }, // Grün
-            Material::Metal { specular_color: Vec3::new(1.0, 0.8, 0.2), glossiness: 0.0 }, // Gold
-        ];
-
-        for (i, material) in materials.into_iter().enumerate() {
-            let x = i as f32 * 3.0 - 4.5;
-            objects.push(Box::new(Sphere {
-                center: Vec3::new(x, -1.0, -15.0),
-                radius: 1.0,
-                material,
-            }));
-        }
-
-        let camera = Camera::new(
-            Vec3::new(0.0, 12.0, -5.0), 
-            Vec3::new(0.0, 0.0, -11.0), 
-            Vec3::new(0.0, 0.0, -1.0), 
-            65.0, 
-            width as f32 / height as f32
-        );
-
-        Self {
-            objects,
-            lights: vec![Vec3::new(0.0, 15.0, -8.0), Vec3::new(5.0, 10.0, -5.0)],
-            camera,
-            background_color: Color::new(0.05, 0.05, 0.1), 
-        }
-    }
-
-    pub fn nahaufnahme_scene(width: usize, height: usize) -> Self {
-        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
-        
-        // Grosse, spiegelnde Goldkugel im Zentrum
-        objects.push(Box::new(Sphere {
-            center: Vec3::new(0.0, 0.0, -5.0), 
-            radius: 0.8,
-            material: Material::Metal {
-                specular_color: Vec3::new(1.0, 0.8, 0.2),
-                glossiness: 0.0,
-            },
-        }));
-
-        // Kleine Glaskugel daneben - etwas näher herangeholt
-        objects.push(Box::new(Sphere {
-            center: Vec3::new(1.0, 0.3, -4.5), 
-            radius: 0.4,
-            material: Material::Dielectric {
-                refractive_index: 1.5,
-                absorption: 0.0,
-            },
-        }));
-
-        // Kamera etwas weiter zurück und FOV auf 40.0 für besseren Fokus
-        let camera = Camera::new(
-            Vec3::new(1.0, 0.8, -1.5), 
-            Vec3::new(0.0, 0.0, -5.0), 
-            Vec3::new(0.0, 1.0, 0.0), 
-            40.0, 
-            width as f32 / height as f32
-        );
-
-        Self {
-            objects,
-            lights: vec![Vec3::new(3.0, 5.0, -1.0)],
-            camera,
-            // Hintergrund aufgehellt, damit Metall nicht schwarz spiegelt
-            background_color: Color::new(0.15, 0.15, 0.2), 
-        }
-    }
-
-    pub fn froschperspektive_scene(width: usize, height: usize) -> Self {
-        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
-        
-        objects.push(Box::new(Plane {
-            point: Vec3::new(0.0, -1.0, 0.0),
-            normal: Vec3::new(0.0, 1.0, 0.0).normalize(), 
-            material: Material::Lambert {
-                ambient: 0.15,
-                albedo: Vec3::new(0.2, 0.2, 0.2),
-            },
-        }));
-
-        for i in -2..3 {
-            let height_val = ((i as i32).abs() + 2) as f32 * 2.0;
-            
-            // Die mittlere Säule (i=0) machen wir aus spiegelndem Metall!
-            let material = if i == 0 {
-                Material::Metal { specular_color: Vec3::new(0.9, 0.9, 0.9), glossiness: 0.0 }
-            } else {
-                Material::Phong {
-                    ambient: 0.1,
-                    albedo: Vec3::new(0.2, 0.6, 0.9),
-                    shininess: 30.0,
-                    kd: 0.8,
-                    ka: 1.0,
-                    ks: 0.5,
-                }
-            };
-
-            Self::add_cube_mesh(
-                &mut objects, 
-                Vec3::new(i as f32 * 3.0 - 0.5, -1.0, -12.0), 
-                Vec3::new(i as f32 * 3.0 + 0.5, height_val - 1.0, -11.0), 
-                material
-            );
-        }
-
-        // Weisse "Sonnen"-Kugel weit oben
-        objects.push(Box::new(Sphere {
-            center: Vec3::new(0.0, 10.0, -15.0),
-            radius: 3.0,
-            material: Material::Lambert {
-                ambient: 0.8, 
-                albedo: Vec3::new(1.0, 1.0, 1.0),
-            },
-        }));
-
-        let camera = Camera::new(
-            Vec3::new(0.0, -0.5, -4.0), 
-            Vec3::new(0.0, 5.0, -12.0), 
-            Vec3::new(0.0, 1.0, 0.0), 
-            85.0, 
-            width as f32 / height as f32
-        );
-
-        Self {
-            objects,
-            lights: vec![Vec3::new(10.0, 20.0, -5.0)],
-            camera,
-            background_color: Color::new(0.5, 0.7, 1.0), 
-        }
-    }
-
-    pub fn weitwinkel_scene(width: usize, height: usize) -> Self {
-        let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
-        
-        objects.push(Box::new(Plane {
-            point: Vec3::new(0.0, -2.0, 0.0),
-            normal: Vec3::new(0.0, 1.0, 0.0).normalize(), 
-            material: Material::Lambert {
-                ambient: 0.2,
-                albedo: Vec3::new(0.4, 0.4, 0.4),
-            },
-        }));
-
-        // Wände (Triangles) weiter nach aussen verschoben
-        objects.push(Box::new(Triangle {
-            a: Vec3::new(-8.0, -2.0, -5.0),
-            b: Vec3::new(-8.0, 5.0, -15.0),
-            c: Vec3::new(-8.0, -2.0, -15.0),
-            material: Material::Lambert {
-                ambient: 0.2,
-                albedo: Vec3::new(0.8, 0.8, 0.8),
-            },
-        }));
-
-        objects.push(Box::new(Triangle {
-            a: Vec3::new(8.0, -2.0, -5.0),
-            b: Vec3::new(8.0, 5.0, -15.0),
-            c: Vec3::new(8.0, -2.0, -15.0),
-            material: Material::Lambert {
-                ambient: 0.2,
-                albedo: Vec3::new(0.8, 0.8, 0.8),
-            },
-        }));
-
-        objects.push(Box::new(Sphere {
-            center: Vec3::new(0.0, 0.0, -8.0), 
-            radius: 1.5,
-            material: Material::Dielectric {
-                refractive_index: 1.5,
-                absorption: 0.0,
-            },
-        }));
-
-        // FOV auf 90.0 reduziert, um extreme Randverzerrung zu vermeiden
-        let camera = Camera::new(
-            Vec3::new(0.0, 0.0, 0.0), 
-            Vec3::new(0.0, 0.0, -10.0), 
-            Vec3::new(0.0, 1.0, 0.0), 
-            90.0, 
-            width as f32 / height as f32
-        );
-
-        Self {
-            objects,
-            lights: vec![Vec3::new(0.0, 5.0, -5.0)],
-            camera,
-            background_color: Color::new(0.1, 0.1, 0.1), 
-        }
+        let camera = Camera::new(Vec3::new(0.0, 1.0, 2.0), Vec3::new(0.0, 0.0, -5.0), Vec3::new(0.0, 1.0, 0.0), 80.0, width as f32 / height as f32);
+        Self { objects, lights: vec![Vec3::new(10.0, 10.0, 5.0), Vec3::new(-10.0, 10.0, 5.0)], camera, background_color: Color::new(0.08, 0.08, 0.1) }
     }
 }

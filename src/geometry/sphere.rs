@@ -2,6 +2,7 @@ use crate::math::vector3d::Vec3;
 use crate::math::ray::Ray;
 use crate::geometry::hittable::{Hit, Hittable};
 use crate::material::Material;
+use crate::geometry::aabb::AABB;
 
 pub struct Sphere {
     pub center: Vec3,
@@ -18,7 +19,7 @@ impl Hittable for Sphere {
         let discriminant = b * b - 4.0 * a * c;
 
         if discriminant > 0.0 {
-            let mut check_hit = |temp: f32| -> Option<Hit> {
+            let check_hit = |temp: f32| -> Option<Hit> {
                 if temp > 0.001 {
                     let point = ray.at(temp);
                     let outward_normal = (point - self.center).normalize();
@@ -45,5 +46,12 @@ impl Hittable for Sphere {
             }
         }
         None
+    }
+
+    fn bounding_box(&self) -> AABB {
+        AABB {
+            min: self.center - crate::math::vector3d::Vec3::new(self.radius, self.radius, self.radius),
+            max: self.center + crate::math::vector3d::Vec3::new(self.radius, self.radius, self.radius),
+        }
     }
 }

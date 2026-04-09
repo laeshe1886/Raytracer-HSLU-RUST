@@ -28,6 +28,6 @@ pub enum Material {
     },
     Dielectric {
         refractive_index: f32, 
-        absorption: f32,
+        absorption: Vec3,
     },
 }

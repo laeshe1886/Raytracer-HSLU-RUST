@@ -2,6 +2,7 @@ use crate::math::vector3d::Vec3;
 use crate::math::ray::Ray;
 use crate::geometry::hittable::{Hit, Hittable};
 use crate::material::Material;
+use crate::geometry::aabb::AABB;
 
 pub struct Plane {
     pub point: Vec3,
@@ -29,5 +30,13 @@ impl Hittable for Plane {
             }
         }
         None
+    }
+
+    fn bounding_box(&self) -> AABB {
+        // Eine Ebene ist theoretisch unendlich. Wir geben ihr eine extrem grosse Box.
+        AABB {
+            min: crate::math::vector3d::Vec3::new(-10000.0, -0.001, -10000.0),
+            max: crate::math::vector3d::Vec3::new(10000.0, 0.001, 10000.0),
+        }
     }
 }

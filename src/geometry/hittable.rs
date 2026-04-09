@@ -1,6 +1,7 @@
 use crate::math::vector3d::Vec3;
 use crate::math::ray::Ray;
 use crate::material::Material;
+use crate::geometry::aabb::AABB;
 
 pub struct Hit {
     pub distance: f32,    
@@ -13,4 +14,6 @@ pub struct Hit {
 
 pub trait Hittable: Sync + Send {
     fn intersect(&self, ray: &Ray) -> Option<Hit>;
+
+    fn bounding_box(&self) -> AABB;
 }

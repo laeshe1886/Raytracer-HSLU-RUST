@@ -5,6 +5,8 @@ use crate::math::ray::Ray;
 use crate::math::vector3d::Vec3;
 use crate::material::Material;
 use rayon::prelude::*;
+use rand::Rng;
+
 
 pub struct RenderData<'a> {
     pub height: usize,
@@ -32,10 +34,12 @@ fn in_shadow(point: Vec3, light_dir: Vec3, light_distance: f32, scene: &Scene) -
     let shadow_ray = Ray { origin: point, direction: light_dir };
     for object in &scene.objects {
         if let Some(sh) = object.intersect(&shadow_ray) {
-            if let Material::Dielectric { .. } = sh.material {
-                    continue; 
+            if sh.distance < light_distance {
+                if let Material::Dielectric { .. } = sh.material {
+                    continue;
                 }
                 return true;
+            }
         }
     }
     false
@@ -141,23 +145,35 @@ pub fn shade(hit: &Hit, scene: &Scene, ray: &Ray) -> Vec3 {
     }
 }
 
-// === NEU: DIE REKURSIVE HAUPTFUNKTION ===
 pub fn trace_ray(ray: &Ray, scene: &Scene, depth: u32) -> Vec3 {
     // Abbruchbedingung für Rekursion (verhindert Endlosschleifen zwischen Spiegeln)
-    if depth >= 50 {
+    if depth >= 10 {
         return Vec3::new(0.0, 0.0, 0.0);
     }
 
     if let Some(hit) = intersect_scene(ray, scene) {
         match hit.material {
+            // --- Matte und glänzende Standard-Materialien ---
             Material::Lambert { .. } | Material::Phong { .. } | Material::BlinnPhong { .. } => {
                 shade(&hit, scene, ray)
             },
-            Material::Metal { specular_color, glossiness: _ } => {
+            
+            // --- Glossy Reflections für Metall ---
+            Material::Metal { specular_color, glossiness } => {
                 let reflected_dir = reflect(ray.direction.normalize(), hit.normal);
+                
+                // Zufälliger Vektor für matten Glanz
+                let mut rng = rand::thread_rng();
+                let random_vec = Vec3::new(
+                    rng.gen_range(-1.0..1.0),
+                    rng.gen_range(-1.0..1.0),
+                    rng.gen_range(-1.0..1.0)
+                ).normalize();
+                
                 let scattered_ray = Ray {
-                    origin: hit.point + hit.normal * 0.01,
-                    direction: reflected_dir,
+                    // Strahl prallt ab -> Offset auf der Seite der Normalen (+)
+                    origin: hit.point + hit.normal * 0.001,
+                    direction: (reflected_dir + random_vec * glossiness).normalize(),
                 };
                 let bounce_color = trace_ray(&scattered_ray, scene, depth + 1);
                 
@@ -167,35 +183,68 @@ pub fn trace_ray(ray: &Ray, scene: &Scene, depth: u32) -> Vec3 {
                     specular_color.z * bounce_color.z
                 )
             },
-            Material::Dielectric { refractive_index, absorption: _ } => {
-                let refraction_ratio = if hit.frontface { 1.0 / refractive_index } else { refractive_index };
+
+            // --- Fresnel, Absorption und Brechung für Glas ---
+            Material::Dielectric { refractive_index, absorption } => {
+                // eta1: Medium aus dem der Strahl kommt, eta2: Medium in das er geht
+                let (eta1, eta2) = if hit.frontface {
+                    (1.0, refractive_index) // Strahl tritt in das Objekt ein (Luft -> Glas)
+                } else {
+                    (refractive_index, 1.0) // Strahl tritt aus dem Objekt aus (Glas -> Luft)
+                };
+                
+                let refraction_ratio = eta1 / eta2;
                 let unit_direction = ray.direction.normalize();
                 
+                // hit.normal zeigt in deiner Struktur IMMER entgegen der ray.direction
                 let cos_theta = (unit_direction * -1.0).dot(&hit.normal).min(1.0);
-                let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
-                let cannot_refract = refraction_ratio * sin_theta > 1.0;
                 
-                let direction = if cannot_refract {
-                    reflect(unit_direction, hit.normal)
-                } else {
-                    refract(unit_direction, hit.normal, refraction_ratio).unwrap_or_else(|| reflect(unit_direction, hit.normal))
+                // 1. Reflexion (bleibt im selben Medium -> + hit.normal Offset)
+                let reflected_dir = reflect(unit_direction, hit.normal);
+                let reflected_ray = Ray { 
+                    origin: hit.point + hit.normal * 0.001, 
+                    direction: reflected_dir 
                 };
+                let reflected_color = trace_ray(&reflected_ray, scene, depth + 1);
                 
-                // Wir müssen den Startpunkt korrekt auf die Seite schieben, in die der Strahl weiterfliegt
-                let normal_offset = if direction.dot(&hit.normal) > 0.0 { hit.normal } else { hit.normal * -1.0 };
-                
-                let scattered_ray = Ray {
-                    origin: hit.point + normal_offset * 0.01,
-                    direction,
-                };
-                
-                trace_ray(&scattered_ray, scene, depth + 1)
+                // 2. Brechung (wechselt in das andere Medium -> - hit.normal Offset)
+                match refract(unit_direction, hit.normal, refraction_ratio) {
+                    Some(refracted_dir) => {
+                        let refracted_ray = Ray { 
+                            origin: hit.point - hit.normal * 0.001, 
+                            direction: refracted_dir 
+                        };
+                        let mut refracted_color = trace_ray(&refracted_ray, scene, depth + 1);
+                        
+                        // Absorption nach Lambert-Beer (nur auf dem Weg DURCH das Glas, also beim Austritt)
+                        if !hit.frontface {
+                            let absorb_x = (-absorption.x * hit.distance).exp();
+                            let absorb_y = (-absorption.y * hit.distance).exp();
+                            let absorb_z = (-absorption.z * hit.distance).exp();
+                            refracted_color = Vec3::new(
+                                refracted_color.x * absorb_x,
+                                refracted_color.y * absorb_y,
+                                refracted_color.z * absorb_z
+                            );
+                        }
+                        
+                        // Schlick-Approximation (Mischt Reflexion und Brechung je nach Blickwinkel)
+                        let r0 = ((eta1 - eta2) / (eta1 + eta2)).powi(2);
+                        let f = r0 + (1.0 - r0) * (1.0 - cos_theta).powi(5);
+                        
+                        reflected_color * f + refracted_color * (1.0 - f)
+                    },
+                    None => {
+                        // Totale interne Reflexion (Strahl kommt in diesem flachen Winkel nicht heraus)
+                        reflected_color
+                    }
+                }
             }
         }
     } else {
+        // Hintergrundfarbe
         let unit_direction = ray.direction.normalize();
         let t = 0.5 * (unit_direction.y + 1.0);
-        
         Vec3::new(1.0, 1.0, 1.0) * (1.0 - t) + Vec3::new(0.5, 0.7, 1.0) * t
     }
 }
@@ -203,7 +252,6 @@ pub fn trace_ray(ray: &Ray, scene: &Scene, depth: u32) -> Vec3 {
 pub fn calculate_pixel_color(x: usize, y: usize, width: usize, height: usize, scene: &Scene) -> u32 {
     let ray = scene.camera.make_ray(x, y, width, height);
     
-    // Start der Rekursion mit depth = 0
     let final_color_vec = trace_ray(&ray, scene, 0);
 
     let c = Color::new(final_color_vec.x, final_color_vec.y, final_color_vec.z).clamp();
