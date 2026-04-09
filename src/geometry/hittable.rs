@@ -8,6 +8,7 @@ pub struct Hit {
     pub normal: Vec3,
     pub uv: (f32, f32),   
     pub material: Material,
+    pub frontface: bool,
 }
 
 pub trait Hittable: Sync + Send {

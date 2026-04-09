@@ -22,4 +22,12 @@ pub enum Material {
         ka: f32,
         ks: f32,
     },
+    Metal {
+    specular_color: Vec3,
+    glossiness: f32,
+    },
+    Dielectric {
+        refractive_index: f32, 
+        absorption: f32,
+    },
 }

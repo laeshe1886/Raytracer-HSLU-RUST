@@ -38,13 +38,17 @@ impl Hittable for Triangle {
 
         let t = f * edge2.dot(&q);
         if t > 0.001 {
-            let normal = edge1.cross(&edge2).normalize();
+            let outward_normal = edge1.cross(&edge2).normalize();
+            let frontface = ray.direction.dot(&outward_normal) < 0.0;
+            let normal = if frontface { outward_normal } else { outward_normal * -1.0 };
+
             return Some(Hit {
                 distance: t,
                 point: ray.at(t),
-                normal: if a < 0.0 { normal * -1.0 } else { normal },
+                normal,
                 uv: (0.0, 0.0),
                 material: self.material,
+                frontface,
             });
         }
         None

@@ -16,10 +16,10 @@ fn main() {
     let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
     
     // Wähle hier die gewünschte Szene aus:
-    //let scene = Scene::default_scene(WIDTH, HEIGHT);
+    let scene = Scene::default_scene(WIDTH, HEIGHT);
     //let scene = Scene::vogelperspektive_scene(WIDTH, HEIGHT);
     // let scene = Scene::nahaufnahme_scene(WIDTH, HEIGHT);
-     let scene = Scene::froschperspektive_scene(WIDTH, HEIGHT);
+    // let scene = Scene::froschperspektive_scene(WIDTH, HEIGHT);
     // let scene = Scene::weitwinkel_scene(WIDTH, HEIGHT);
 
     let mut window = Window::new(

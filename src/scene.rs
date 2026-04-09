@@ -42,8 +42,29 @@ impl Scene {
     pub fn default_scene(width: usize, height: usize) -> Self {
         let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
         
+        // 1. Perfekter Spiegel auf der linken Seite
         objects.push(Box::new(Sphere {
-            center: Vec3::new(-2.0, 0.0, -6.0), 
+            center: Vec3::new(-3.5, 0.0, -5.0), 
+            radius: 2.0,
+            material: Material::Metal {
+                specular_color: Vec3::new(0.9, 0.9, 0.9), // Silber
+                glossiness: 0.0,
+            },
+        }));
+
+        // 2. Kugel aus Glas auf der rechten Seite
+        objects.push(Box::new(Sphere {
+            center: Vec3::new(3.5, 0.0, -5.0), 
+            radius: 2.0,
+            material: Material::Dielectric {
+                refractive_index: 1.5, // Glas
+                absorption: 0.0,
+            },
+        }));
+
+        // Rote Blinn-Phong Kugel im Hintergrund
+        objects.push(Box::new(Sphere {
+            center: Vec3::new(0.0, 0.0, -8.0), 
             radius: 2.0,
             material: Material::BlinnPhong {
                 ambient: 0.1,
@@ -55,16 +76,7 @@ impl Scene {
             },
         }));
 
-        objects.push(Box::new(Triangle {
-            a: Vec3::new(0.0, 2.0, -4.0),
-            b: Vec3::new(-1.5, 0.0, -4.0),
-            c: Vec3::new(1.5, 0.0, -4.0),
-            material: Material::Lambert {
-                ambient: 0.2,
-                albedo: Vec3::new(1.0, 1.0, 0.0),
-            },
-        }));
-
+        // Matter Lambert-Boden
         objects.push(Box::new(Plane {
             point: Vec3::new(0.0, -2.0, 0.0),
             normal: Vec3::new(0.0, 1.0, 0.0).normalize(), 
@@ -73,20 +85,6 @@ impl Scene {
                 albedo: Vec3::new(0.2, 0.5, 0.8),
             },
         }));
-
-        Self::add_cube_mesh(
-            &mut objects, 
-            Vec3::new(1.0, -2.0, -7.0), 
-            Vec3::new(4.0, 1.0, -4.0), 
-            Material::Phong {
-                ambient: 0.1,
-                albedo: Vec3::new(0.0, 1.0, 0.0),
-                shininess: 30.0,
-                kd: 0.7,
-                ka: 1.0,
-                ks: 0.9,
-            }
-        );
 
         let camera = Camera::new(
             Vec3::new(0.0, 0.0, 0.0), 
@@ -135,18 +133,20 @@ impl Scene {
             );
         }
 
-        for x in -2..2 {
+        // 4 Kugeln mit unterschiedlichen Materialien, um sie von oben zu betrachten
+        let materials = vec![
+            Material::Metal { specular_color: Vec3::new(0.8, 0.8, 0.8), glossiness: 0.0 }, // Silber
+            Material::Dielectric { refractive_index: 1.5, absorption: 0.0 },               // Glas
+            Material::BlinnPhong { ambient: 0.1, albedo: Vec3::new(0.2, 0.7, 0.2), shininess: 80.0, kd: 0.7, ka: 1.0, ks: 0.9 }, // Grün
+            Material::Metal { specular_color: Vec3::new(1.0, 0.8, 0.2), glossiness: 0.0 }, // Gold
+        ];
+
+        for (i, material) in materials.into_iter().enumerate() {
+            let x = i as f32 * 3.0 - 4.5;
             objects.push(Box::new(Sphere {
-                center: Vec3::new(x as f32 * 4.0, -1.0, -15.0),
-                radius: 0.8,
-                material: Material::BlinnPhong {
-                    ambient: 0.1,
-                    albedo: Vec3::new(0.2, 0.7, 0.2),
-                    shininess: 80.0,
-                    kd: 0.7,
-                    ka: 1.0,
-                    ks: 0.9,
-                },
+                center: Vec3::new(x, -1.0, -15.0),
+                radius: 1.0,
+                material,
             }));
         }
 
@@ -169,69 +169,41 @@ impl Scene {
     pub fn nahaufnahme_scene(width: usize, height: usize) -> Self {
         let mut objects: Vec<Box<dyn Hittable>> = Vec::new();
         
-        // Sehr glänzende goldene Kugel
+        // Grosse, spiegelnde Goldkugel im Zentrum
         objects.push(Box::new(Sphere {
             center: Vec3::new(0.0, 0.0, -5.0), 
             radius: 0.8,
-            material: Material::BlinnPhong {
-                ambient: 0.1,
-                albedo: Vec3::new(1.0, 0.8, 0.0),
-                shininess: 150.0, 
-                kd: 0.6,
-                ka: 1.0,
-                ks: 1.0,
+            material: Material::Metal {
+                specular_color: Vec3::new(1.0, 0.8, 0.2),
+                glossiness: 0.0,
             },
         }));
 
-        // Blaue Kugel
+        // Kleine Glaskugel daneben - etwas näher herangeholt
         objects.push(Box::new(Sphere {
-            center: Vec3::new(1.2, 0.5, -7.0), 
+            center: Vec3::new(1.0, 0.3, -4.5), 
             radius: 0.4,
-            material: Material::Phong {
-                ambient: 0.15,
-                albedo: Vec3::new(0.0, 0.5, 1.0),
-                shininess: 50.0,
-                kd: 0.8,
-                ka: 1.0,
-                ks: 0.8,
+            material: Material::Dielectric {
+                refractive_index: 1.5,
+                absorption: 0.0,
             },
         }));
 
-        // Mattes grünes Dreieck
-        objects.push(Box::new(Triangle {
-            a: Vec3::new(-1.5, -0.5, -6.0),
-            b: Vec3::new(-0.5, -0.8, -6.0),
-            c: Vec3::new(-1.0, 0.5, -6.0),
-            material: Material::Lambert {
-                ambient: 0.2,
-                albedo: Vec3::new(0.5, 1.0, 0.5),
-            },
-        }));
-
-        // Grauer Würfel
-        Self::add_cube_mesh(
-            &mut objects,
-            Vec3::new(-2.0, -1.0, -8.0),
-            Vec3::new(-1.0, 0.0, -7.0),
-            Material::Lambert {
-                ambient: 0.2,
-                albedo: Vec3::new(0.7, 0.7, 0.7),
-            }
-        );
-
+        // Kamera etwas weiter zurück und FOV auf 40.0 für besseren Fokus
         let camera = Camera::new(
-            Vec3::new(0.8, 0.5, -2.0), 
+            Vec3::new(1.0, 0.8, -1.5), 
             Vec3::new(0.0, 0.0, -5.0), 
             Vec3::new(0.0, 1.0, 0.0), 
-            30.0, 
+            40.0, 
             width as f32 / height as f32
         );
 
         Self {
             objects,
-            lights: vec![Vec3::new(2.0, 3.0, -2.0)],
+            lights: vec![Vec3::new(3.0, 5.0, -1.0)],
             camera,
-            background_color: Color::new(0.02, 0.02, 0.02), 
+            // Hintergrund aufgehellt, damit Metall nicht schwarz spiegelt
+            background_color: Color::new(0.15, 0.15, 0.2), 
         }
     }
 
@@ -249,10 +221,11 @@ impl Scene {
 
         for i in -2..3 {
             let height_val = ((i as i32).abs() + 2) as f32 * 2.0;
-            Self::add_cube_mesh(
-                &mut objects, 
-                Vec3::new(i as f32 * 3.0 - 0.5, -1.0, -12.0), 
-                Vec3::new(i as f32 * 3.0 + 0.5, height_val - 1.0, -11.0), 
+            
+            // Die mittlere Säule (i=0) machen wir aus spiegelndem Metall!
+            let material = if i == 0 {
+                Material::Metal { specular_color: Vec3::new(0.9, 0.9, 0.9), glossiness: 0.0 }
+            } else {
                 Material::Phong {
                     ambient: 0.1,
                     albedo: Vec3::new(0.2, 0.6, 0.9),
@@ -261,6 +234,13 @@ impl Scene {
                     ka: 1.0,
                     ks: 0.5,
                 }
+            };
+
+            Self::add_cube_mesh(
+                &mut objects, 
+                Vec3::new(i as f32 * 3.0 - 0.5, -1.0, -12.0), 
+                Vec3::new(i as f32 * 3.0 + 0.5, height_val - 1.0, -11.0), 
+                material
             );
         }
 
@@ -269,7 +249,7 @@ impl Scene {
             center: Vec3::new(0.0, 10.0, -15.0),
             radius: 3.0,
             material: Material::Lambert {
-                ambient: 0.8, // Hoher Ambient-Wert, damit sie selbst leuchtend aussieht
+                ambient: 0.8, 
                 albedo: Vec3::new(1.0, 1.0, 1.0),
             },
         }));
@@ -302,10 +282,11 @@ impl Scene {
             },
         }));
 
+        // Wände (Triangles) weiter nach aussen verschoben
         objects.push(Box::new(Triangle {
-            a: Vec3::new(-5.0, -2.0, -5.0),
-            b: Vec3::new(-5.0, 5.0, -15.0),
-            c: Vec3::new(-5.0, -2.0, -15.0),
+            a: Vec3::new(-8.0, -2.0, -5.0),
+            b: Vec3::new(-8.0, 5.0, -15.0),
+            c: Vec3::new(-8.0, -2.0, -15.0),
             material: Material::Lambert {
                 ambient: 0.2,
                 albedo: Vec3::new(0.8, 0.8, 0.8),
@@ -313,9 +294,9 @@ impl Scene {
         }));
 
         objects.push(Box::new(Triangle {
-            a: Vec3::new(5.0, -2.0, -5.0),
-            b: Vec3::new(5.0, 5.0, -15.0),
-            c: Vec3::new(5.0, -2.0, -15.0),
+            a: Vec3::new(8.0, -2.0, -5.0),
+            b: Vec3::new(8.0, 5.0, -15.0),
+            c: Vec3::new(8.0, -2.0, -15.0),
             material: Material::Lambert {
                 ambient: 0.2,
                 albedo: Vec3::new(0.8, 0.8, 0.8),
@@ -325,35 +306,18 @@ impl Scene {
         objects.push(Box::new(Sphere {
             center: Vec3::new(0.0, 0.0, -8.0), 
             radius: 1.5,
-            material: Material::BlinnPhong {
-                ambient: 0.1,
-                albedo: Vec3::new(1.0, 0.2, 0.2),
-                shininess: 60.0,
-                kd: 0.9,
-                ka: 1.0,
-                ks: 0.9,
+            material: Material::Dielectric {
+                refractive_index: 1.5,
+                absorption: 0.0,
             },
         }));
 
-        Self::add_cube_mesh(
-            &mut objects,
-            Vec3::new(-1.0, -2.0, -5.0),
-            Vec3::new(1.0, 0.0, -4.0),
-            Material::Phong {
-                ambient: 0.1,
-                albedo: Vec3::new(0.2, 0.2, 1.0),
-                shininess: 40.0,
-                kd: 0.7,
-                ka: 1.0,
-                ks: 0.8,
-            }
-        );
-
+        // FOV auf 90.0 reduziert, um extreme Randverzerrung zu vermeiden
         let camera = Camera::new(
-            Vec3::new(0.0, 0.0, -1.0), 
+            Vec3::new(0.0, 0.0, 0.0), 
             Vec3::new(0.0, 0.0, -10.0), 
             Vec3::new(0.0, 1.0, 0.0), 
-            110.0, 
+            90.0, 
             width as f32 / height as f32
         );
 
